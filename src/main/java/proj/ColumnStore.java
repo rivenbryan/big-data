@@ -69,4 +69,11 @@ public class ColumnStore {
         }
         return filteredResalePrices;
     }
+    public List<Double> getFloorAreas() {
+        List<Double> filteredFloorAreas = new ArrayList<>();
+        for (Integer index : indexSet) {
+            filteredFloorAreas.add(floorAreas.get(index));
+        }
+        return filteredFloorAreas;
+    }
 }
