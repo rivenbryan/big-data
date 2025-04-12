@@ -139,6 +139,26 @@ public class ColumnStore {
                     disk.add(entry.getKey(), entry.getValue());
                 }
             }
+            
+            System.out.println("\n===== Disk Contents After Loading =====");
+            for (Map.Entry<String, List<?>> entry : disk.getAll().entrySet()) {
+                String key = entry.getKey();
+                List<?> value = entry.getValue();
+                
+                if (!value.isEmpty()) {
+                    Object first = value.get(0);
+                    if (first instanceof Partition) {
+                        System.out.println("Key = " + key + " -> Partition");
+                    } else if (first instanceof Block) {
+                        System.out.println("Key = " + key + " -> List<Block>");
+                    } else {
+                        System.out.println("Key = " + key + " -> Unknown Type");
+                    }
+                } else {
+                    System.out.println("Key = " + key + " -> Empty List");
+                }
+            }
+            System.out.println("========================================\n");
         }
 
         long endTime = System.currentTimeMillis();

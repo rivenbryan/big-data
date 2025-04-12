@@ -13,18 +13,30 @@ public class Main {
         }
 
         String matricNumber = args[0];
-        String mode = (args.length >= 2) ? args[1] : "1";
+        boolean sharedScan = true; 
         String partitionBy = null;
 
-        if (args.length >= 3) {
-            String thirdArg = args[2];
-            if (thirdArg.startsWith("partitionBy=")) {
-                partitionBy = thirdArg.substring("partitionBy=".length());
+        for (int i = 1; i < args.length; i++) {
+            String arg = args[i];
+
+            if (arg.startsWith("sharedScan=")) {
+                String value = arg.substring("sharedScan=".length());
+                if (value.equalsIgnoreCase("true")) {
+                    sharedScan = true;
+                } else if (value.equalsIgnoreCase("false")) {
+                    sharedScan = false;
+                } else {
+                    throw new IllegalArgumentException("Invalid sharedScan value. Use true or false.");
+                }
+            } else if (arg.startsWith("partitionBy=")) {
+                partitionBy = arg.substring("partitionBy=".length());
+            } else {
+                throw new IllegalArgumentException("Unknown argument: " + arg);
             }
         }
 
         System.out.println("Matric Card provided: " + matricNumber);
-        System.out.println("Mode selected: " + mode);
+        System.out.println("Shared Scan: " + sharedScan);
         if (partitionBy != null) {
             System.out.println("Partitioning by: " + partitionBy);
         } else {
@@ -38,12 +50,10 @@ public class Main {
         System.out.println("End Year-Month: " + result.get(Constant.KEY_END_YEAR_MONTH));
 
         try {
-            if (mode.equals("0")) {
-                RunUnoptimized.runAndOutput(matricNumber, result, partitionBy);
-            } else if (mode.equals("1")) {
-                RunOptimized.runAndOutput(matricNumber, result, partitionBy);
+            if (sharedScan) {
+                RunSharedScan.runAndOutput(matricNumber, result, partitionBy);
             } else {
-                throw new IllegalArgumentException("Invalid mode. Must be 0 (unoptimized) or 1 (optimized).");
+                RunNormal.runAndOutput(matricNumber, result, partitionBy);
             }
         } catch (Exception e) {
             System.out.println("Error occurred during execution: " + e.getMessage());

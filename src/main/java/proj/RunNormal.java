@@ -3,7 +3,7 @@ package proj;
 import java.util.List;
 import java.util.Map;
 
-public class RunUnoptimized {
+public class RunNormal {
 
     public static void runAndOutput(String matricNumber, Map<String, String> result, String partitionBy) throws Exception {
         Statistics[] statsArray = run(result, partitionBy);
@@ -41,24 +41,14 @@ public class RunUnoptimized {
         ColumnStore csStd = new ColumnStore(master);
         ColumnStore csMinPerSqm = new ColumnStore(master);
 
-        csMin.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
-        csMin.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
-        csMin.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
+        applySmartFilter(csMin, result, partitionBy);
+        applySmartFilter(csAvg, result, partitionBy);
+        applySmartFilter(csStd, result, partitionBy);
+        applySmartFilter(csMinPerSqm, result, partitionBy);
+
         List<Object> resalePricesForMin = csMin.getColumnValues("resale_price");
-
-        csAvg.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
-        csAvg.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
-        csAvg.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
         List<Object> resalePricesForAvg = csAvg.getColumnValues("resale_price");
-
-        csStd.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
-        csStd.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
-        csStd.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
         List<Object> resalePricesForStd = csStd.getColumnValues("resale_price");
-
-        csMinPerSqm.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
-        csMinPerSqm.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
-        csMinPerSqm.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
         List<Object> resalePricesForMinPerSqm = csMinPerSqm.getColumnValues("resale_price");
         List<Object> floorAreasForMinPerSqm = csMinPerSqm.getColumnValues("floor_area_sqm");
 
@@ -72,5 +62,16 @@ public class RunUnoptimized {
         Statistics statsMinPerSqm = new Statistics(Util.castToDouble(resalePricesForMinPerSqm), Util.castToDouble(floorAreasForMinPerSqm));
 
         return new Statistics[]{statsMin, statsAvg, statsStd, statsMinPerSqm};
+    }
+
+    private static void applySmartFilter(ColumnStore cs, Map<String, String> result, String partitionBy) throws Exception {
+        if ("town".equals(partitionBy)) {
+            cs.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
+            cs.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
+        } else {
+            cs.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
+            cs.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
+        }
+        cs.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
     }
 }
