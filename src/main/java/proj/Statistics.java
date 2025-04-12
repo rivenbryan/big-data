@@ -1,8 +1,6 @@
 package proj;
 
 import java.util.List;
-import java.util.DoubleSummaryStatistics;
-import java.util.stream.Collectors;
 
 /**
  * Statistics class to calculate various statistics on filtered HDB resale data
@@ -136,6 +134,21 @@ public class Statistics {
                 return Math.round(getStandardDeviation() * 100) / 100.0;
             case "Minimum Price per Square Meter":
                 return Math.round(getMinimumPricePerSquareMeter() * 100) / 100.0;
+            default:
+                return Double.NaN;
+        }
+    }
+    
+    public double getValueForCategory(String category) {
+        switch (category) {
+            case "Minimum Price":
+                return getMinimumPrice();
+            case "Average Price":
+                return getAveragePrice();
+            case "Standard Deviation of Price":
+                return getStandardDeviation();
+            case "Minimum Price per Square Meter":
+                return getMinimumPricePerSquareMeter();
             default:
                 return Double.NaN;
         }

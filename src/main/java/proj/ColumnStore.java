@@ -1,79 +1,158 @@
 package proj;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+
 
 public class ColumnStore {
 
-    private final List<String> months;      // Format: YYYY-MM
-    private final List<String> towns;       // Town names
-    private final List<Double> floorAreas;  // Floor areas in square meters
-    private final List<Double> resalePrices;// Resale prices in SGD
+    private final Disk disk;
     private final Set<Integer> indexSet = new HashSet<>();
+    private String[] headers;
 
     public ColumnStore() {
-        this.months = new ArrayList<>();
-        this.towns = new ArrayList<>();
-        this.floorAreas = new ArrayList<>();
-        this.resalePrices = new ArrayList<>();
+        this.disk = new Disk();
     }
 
     public void loadData(String filepath) throws IOException {
         int lineCount = 0;
-        InputStream input = getClass().getClassLoader().getResourceAsStream("ResalePricesSingapore.csv");
+        InputStream input = getClass().getClassLoader().getResourceAsStream(filepath);
+
+        if (input == null) {
+            throw new FileNotFoundException("File not found: " + filepath);
+        }
+
         try (BufferedReader br = new BufferedReader(new InputStreamReader(input))) {
-            String line = br.readLine(); // Skip header row
-            System.out.println("Loading data from file: " + filepath);
+            String headerLine = br.readLine();
+            if (headerLine == null) {
+                throw new IOException("Empty CSV file!");
+            }
 
+            headers = headerLine.split(",");
+            int columnCount = headers.length;
 
+            Map<String, Block<Object>> currentBlocks = new HashMap<>();
+            for (String header : headers) {
+                currentBlocks.put(header.trim(), new Block<>());
+            }
+
+            String line;
             while ((line = br.readLine()) != null) {
-                String[] values = line.split(",");
-                // Store each column value in its respective array
-                months.add(values[0].trim());
-                towns.add(values[1].trim());
-                floorAreas.add(Double.parseDouble(values[6].trim()));
-                resalePrices.add(Double.parseDouble(values[9].trim()));
+                String[] values = line.split(",", -1);
+
+                for (int i = 0; i < columnCount; i++) {
+                    String header = headers[i].trim();
+                    String rawValue = values.length > i ? values[i].trim() : "";
+
+                    Block<Object> block = currentBlocks.get(header);
+
+                    Object value;
+                    int dataSize;
+
+                    try {
+                        value = Float.parseFloat(rawValue);
+                        dataSize = Constant.FLOAT_BYTES; 
+                    } catch (NumberFormatException e) {
+                        value = rawValue;
+                        dataSize = Constant.VARCHAR_BYTES; 
+                    }
+
+                    if (!block.isAbleToAdd(dataSize)) {
+                        disk.add(header, block);
+                        block = new Block<>();
+                        currentBlocks.put(header, block);
+                    }
+                    block.addData(value, dataSize);
+                }
+
                 indexSet.add(lineCount);
                 lineCount++;
             }
 
+            for (Map.Entry<String, Block<Object>> entry : currentBlocks.entrySet()) {
+                disk.add(entry.getKey(), entry.getValue());
+            }
         }
-        System.out.println("Data loaded successfully. Total records: " + lineCount);
     }
 
+    public void filterDataByEquality(String columnName, String valueToMatch) {
+        List<Object> columnValues = flattenColumn(columnName);
+        indexSet.removeIf(i -> {
+            Object value = columnValues.get(i);
+            return !valueToMatch.equals(value.toString());
+        });
+    }
+    
+    public void filterDataByDateRange(String columnName, String startDate, String endDate) {
+        List<Object> columnValues = flattenColumn(columnName);
 
-    public void filterData(String townName, String startYearMonth, String endYearMonth, Integer area) {
-        System.out.println("Filtering data for town: " + townName);
-        System.out.println("Start Year Month: " + startYearMonth);
-        System.out.println("End Year Month: " + endYearMonth);
-        System.out.println("Floor Area: " + area);
-        System.out.println("Index Set: " + indexSet.size());
+        LocalDate start = parseToLocalDate(startDate);
+        LocalDate end = parseToLocalDate(endDate);
 
-        // Remove all indices that do not match the filter criteria (Ang Mo Kio)
-        indexSet.removeIf(i -> !towns.get(i).equals(townName));
-        indexSet.removeIf(i -> !months.get(i).equals(startYearMonth) && !months.get(i).equals(endYearMonth));
-        indexSet.removeIf(i -> floorAreas.get(i) < area);
+        indexSet.removeIf(i -> {
+            String value = columnValues.get(i).toString();
+            LocalDate valueDate;
+            try {
+                valueDate = parseToLocalDate(value);
+            } catch (DateTimeParseException e) {
+                return true;
+            }
+            return valueDate.isBefore(start) || valueDate.isAfter(end);
+        });
+    }
+    
+    public void filterDataByRange(String columnName, String operator, float valueToMatch) {
+        List<Object> columnValues = flattenColumn(columnName);
 
-        System.out.println("Index Set after start filter: " + indexSet.size());
+        indexSet.removeIf(i -> {
+            Object valueObj = columnValues.get(i);
+            if (valueObj == null) return true; 
+
+            float value;
+            try {
+                value = Float.parseFloat(valueObj.toString());
+            } catch (NumberFormatException e) {
+                return true; 
+            }
+
+            switch (operator) {
+                case ">=": return !(value >= valueToMatch);
+                case "<=": return !(value <= valueToMatch);
+                case ">":  return !(value > valueToMatch);
+                case "<":  return !(value < valueToMatch);
+                default:
+                    throw new IllegalArgumentException("Invalid operator: " + operator);
+            }
+        });
     }
 
-    // Return out an array of resalesPrices
-    public List<Double> getResalePrices() {
-
-        List<Double> filteredResalePrices = new ArrayList<>();
-        for (Integer index : indexSet) {
-            filteredResalePrices.add(resalePrices.get(index));
+    private LocalDate parseToLocalDate(String dateStr) {
+        if (dateStr.length() == 4) {
+            return LocalDate.parse(dateStr + "-01-01", DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        } else if (dateStr.length() == 7) {
+            return LocalDate.parse(dateStr + "-01", DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        } else { 
+            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         }
-        return filteredResalePrices;
     }
-    public List<Double> getFloorAreas() {
-        List<Double> filteredFloorAreas = new ArrayList<>();
-        for (Integer index : indexSet) {
-            filteredFloorAreas.add(floorAreas.get(index));
+    public List<Object> getColumnValues(String columnName) {
+        List<Object> columnValues = flattenColumn(columnName);
+        List<Object> filteredValues = new ArrayList<>();
+        for (Integer idx : indexSet) {
+            filteredValues.add(columnValues.get(idx));
         }
-        return filteredFloorAreas;
+        return filteredValues;
+    }
+
+    private List<Object> flattenColumn(String columnName) {
+        List<Block<?>> blocks = disk.get(columnName);
+        List<Object> result = new ArrayList<>();
+        for (Block<?> block : blocks) {
+            result.addAll(block.getDataList());
+        }
+        return result;
     }
 }

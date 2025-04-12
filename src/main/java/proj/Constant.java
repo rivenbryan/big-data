@@ -31,6 +31,10 @@ public final class Constant {
     public static final String KEY_TOWN_NAME = "townName";
     public static final String KEY_START_YEAR_MONTH = "startYearMonth";
     public static final String KEY_END_YEAR_MONTH = "endYearMonth";
-    public static final String FILEPATH = "input/ResalePricesSingapore.csv";
+    public static final String FILEPATH = "ResalePricesSingapore.csv";
     public static final Integer AREA = 80; // Floor area in square meters
+    public static final int DEFAULT_BLOCK_SIZE = 8192;
+    
+    public static final int VARCHAR_BYTES = 24;//We use VARCHAR(22) which has 22+2 bytes of overhead
+    public static final int FLOAT_BYTES = 4;
 }
