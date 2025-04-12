@@ -13,10 +13,23 @@ public class Main {
         }
 
         String matricNumber = args[0];
-        String mode = (args.length >= 2) ? args[1] : "optimized";
+        String mode = (args.length >= 2) ? args[1] : "1";
+        String partitionBy = null;
+
+        if (args.length >= 3) {
+            String thirdArg = args[2];
+            if (thirdArg.startsWith("partitionBy=")) {
+                partitionBy = thirdArg.substring("partitionBy=".length());
+            }
+        }
 
         System.out.println("Matric Card provided: " + matricNumber);
         System.out.println("Mode selected: " + mode);
+        if (partitionBy != null) {
+            System.out.println("Partitioning by: " + partitionBy);
+        } else {
+            System.out.println("No partitioning.");
+        }
 
         Map<String, String> result = Util.preprocess(matricNumber);
         System.out.println("Preprocessing completed.");
@@ -25,10 +38,12 @@ public class Main {
         System.out.println("End Year-Month: " + result.get(Constant.KEY_END_YEAR_MONTH));
 
         try {
-            if (mode.equalsIgnoreCase("unoptimized")) {
-                RunUnoptimized.runAndOutput(matricNumber, result);
+            if (mode.equals("0")) {
+                RunUnoptimized.runAndOutput(matricNumber, result, partitionBy);
+            } else if (mode.equals("1")) {
+                RunOptimized.runAndOutput(matricNumber, result, partitionBy);
             } else {
-                RunOptimized.runAndOutput(matricNumber, result);
+                throw new IllegalArgumentException("Invalid mode. Must be 0 (unoptimized) or 1 (optimized).");
             }
         } catch (Exception e) {
             System.out.println("Error occurred during execution: " + e.getMessage());
@@ -36,9 +51,7 @@ public class Main {
         }
 
         long endTime = System.currentTimeMillis();
-        long totalTimeMillis = endTime - startTime;
-        double totalTimeSeconds = totalTimeMillis / 1000.0;
-
+        double totalTimeSeconds = (endTime - startTime) / 1000.0;
         System.out.println(String.format("Total Execution Time: %.2f seconds", totalTimeSeconds));
     }
 }

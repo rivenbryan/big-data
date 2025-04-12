@@ -5,8 +5,8 @@ import java.util.Map;
 
 public class RunUnoptimized {
 
-    public static void runAndOutput(String matricNumber, Map<String, String> result) throws Exception {
-        Statistics[] statsArray = run(result);
+    public static void runAndOutput(String matricNumber, Map<String, String> result, String partitionBy) throws Exception {
+        Statistics[] statsArray = run(result, partitionBy);
 
         if (statsArray == null) {
             throw new RuntimeException("No result found after filtering");
@@ -32,30 +32,30 @@ public class RunUnoptimized {
         Util.writeResultsToCSV(matricNumber, result, statsArray, categories);
     }
 
-    private static Statistics[] run(Map<String, String> result) throws Exception {
-        ColumnStore csMin = new ColumnStore();
-        csMin.loadData(Constant.FILEPATH);
+    private static Statistics[] run(Map<String, String> result, String partitionBy) throws Exception {
+        ColumnStore master = (partitionBy == null) ? new ColumnStore() : new ColumnStore(partitionBy);
+        master.loadData(Constant.FILEPATH);
+
+        ColumnStore csMin = new ColumnStore(master);
+        ColumnStore csAvg = new ColumnStore(master);
+        ColumnStore csStd = new ColumnStore(master);
+        ColumnStore csMinPerSqm = new ColumnStore(master);
+
         csMin.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
         csMin.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
         csMin.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
         List<Object> resalePricesForMin = csMin.getColumnValues("resale_price");
 
-        ColumnStore csAvg = new ColumnStore();
-        csAvg.loadData(Constant.FILEPATH);
         csAvg.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
         csAvg.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
         csAvg.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
         List<Object> resalePricesForAvg = csAvg.getColumnValues("resale_price");
 
-        ColumnStore csStd = new ColumnStore();
-        csStd.loadData(Constant.FILEPATH);
         csStd.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
         csStd.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
         csStd.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
         List<Object> resalePricesForStd = csStd.getColumnValues("resale_price");
 
-        ColumnStore csMinPerSqm = new ColumnStore();
-        csMinPerSqm.loadData(Constant.FILEPATH);
         csMinPerSqm.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
         csMinPerSqm.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
         csMinPerSqm.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);

@@ -23,4 +23,8 @@ public class Disk {
     public <T> List<T> get(String key) {
         return (List<T>) dataHashMap.get(key);
     }
+    
+    public Map<String, List<?>> getAll() {
+        return dataHashMap;
+    }
 }

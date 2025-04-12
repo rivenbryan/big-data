@@ -5,8 +5,8 @@ import java.util.Map;
 
 public class RunOptimized {
 
-    public static void runAndOutput(String matricNumber, Map<String, String> result) throws Exception {
-        Statistics stats = run(result);
+    public static void runAndOutput(String matricNumber, Map<String, String> result, String partitionBy) throws Exception {
+        Statistics stats = run(result, partitionBy);
 
         if (stats == null) {
             throw new RuntimeException("No result found after filtering");
@@ -22,9 +22,10 @@ public class RunOptimized {
         Util.writeResultsToCSV(matricNumber, result, stats);
     }
 
-    private static Statistics run(Map<String, String> result) throws Exception {
-        ColumnStore cs = new ColumnStore();
+    private static Statistics run(Map<String, String> result, String partitionBy) throws Exception {
+        ColumnStore cs = (partitionBy == null) ? new ColumnStore() : new ColumnStore(partitionBy);
         cs.loadData(Constant.FILEPATH);
+
         cs.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
         cs.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
         cs.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);

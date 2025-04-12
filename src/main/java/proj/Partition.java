@@ -19,4 +19,8 @@ public class Partition {
     public List<Block<?>> get(String key) {
         return blockHashMap.get(key);
     }
+    
+    public Map<String, List<Block<?>>> getBlockHashMap() {
+        return blockHashMap;
+    }
 }
