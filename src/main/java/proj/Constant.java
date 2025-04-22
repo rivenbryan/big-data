@@ -1,5 +1,7 @@
 package proj;
 
+import java.util.Map;
+
 public final class Constant {
 
     public static final String[] DIGIT_TO_TOWN = {
@@ -27,6 +29,19 @@ public final class Constant {
             "2018",
             "2019"
     };
+    
+    public static final Map<String, Integer> DISTINCT_COUNT = Map.ofEntries(
+    	    Map.entry("month", 121),
+    	    Map.entry("town", 26),
+    	    Map.entry("flat_type", 7),
+    	    Map.entry("block", 2700),
+    	    Map.entry("street_name", 567),
+    	    Map.entry("storey_range", 17),
+    	    Map.entry("floor_area_sqm", 174),
+    	    Map.entry("flat_model", 21),
+    	    Map.entry("lease_commence_date", 56),
+    	    Map.entry("resale_price", 4083)
+    	);
 
     public static final String KEY_TOWN_NAME = "townName";
     public static final String KEY_START_YEAR_MONTH = "startYearMonth";

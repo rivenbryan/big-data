@@ -1,7 +1,11 @@
 package proj;
 
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * RunSharedScan class handles the execution of the columnar scan using shared scan mode.
@@ -62,6 +66,7 @@ public class RunSharedScan {
 
     /**
      * Applies smart filtering to a ColumnStore instance based on date range, town, and floor area.
+     * Prioritizes the partition column (if specified), and applies remaining filters in order of increasing distinct values.
      *
      * @param cs          The ColumnStore to filter
      * @param result      The preprocessed filter values
@@ -69,13 +74,52 @@ public class RunSharedScan {
      * @throws Exception If filtering fails
      */
     private static void applySmartFilter(ColumnStore cs, Map<String, String> result, String partitionBy) throws Exception {
-        if ("town".equals(partitionBy)) {
-            cs.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
-            cs.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
-        } else {
-            cs.filterDataByDateRange("month", result.get(Constant.KEY_START_YEAR_MONTH), result.get(Constant.KEY_END_YEAR_MONTH));
-            cs.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
+
+        Map<String, String> filters = new HashMap<>();
+        filters.put("town", result.get(Constant.KEY_TOWN_NAME));
+        filters.put("month", result.get(Constant.KEY_START_YEAR_MONTH) + ":" + result.get(Constant.KEY_END_YEAR_MONTH));
+        filters.put("floor_area_sqm", String.valueOf(Constant.AREA));
+
+        Set<String> filtered = new HashSet<>();
+
+        if (partitionBy != null && filters.containsKey(partitionBy)) {
+            switch (partitionBy) {
+                case "month" -> {
+                    String[] range = filters.get("month").split(":");
+                    cs.filterDataByDateRange("month", range[0], range[1]);
+                }
+                case "floor_area_sqm" -> {
+                    cs.filterDataByRange("floor_area_sqm", ">=", Integer.parseInt(filters.get("floor_area_sqm")));
+                }
+                default -> {
+                    cs.filterDataByEquality(partitionBy, filters.get(partitionBy));
+                }
+            }
+            filtered.add(partitionBy);
         }
-        cs.filterDataByRange("floor_area_sqm", ">=", Constant.AREA);
+
+        filters.entrySet().stream()
+            .filter(e -> !filtered.contains(e.getKey()))
+            .sorted(Comparator.comparingInt(e -> Constant.DISTINCT_COUNT.getOrDefault(e.getKey(), Integer.MAX_VALUE)))
+            .forEachOrdered(e -> {
+                try {
+                    String key = e.getKey();
+                    String value = e.getValue();
+                    switch (key) {
+                        case "month" -> {
+                            String[] range = value.split(":");
+                            cs.filterDataByDateRange("month", range[0], range[1]);
+                        }
+                        case "floor_area_sqm" -> {
+                            cs.filterDataByRange("floor_area_sqm", ">=", Integer.parseInt(value));
+                        }
+                        default -> {
+                            cs.filterDataByEquality(key, value);
+                        }
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace(); 
+                }
+            });
     }
 }
