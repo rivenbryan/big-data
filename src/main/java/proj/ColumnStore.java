@@ -12,17 +12,31 @@ public class ColumnStore {
     private Set<Integer> indexSet;
     private String[] headers;
     private String partitionBy;
+    private String zoneMapBy;
+    private Map<Block<?>, int[]> blockIndexMap;
 
     public ColumnStore() {
         this.disk = new Disk();
         this.indexSet = new HashSet<>();
         this.partitionBy = null;
+        this.zoneMapBy = null;
+        this.blockIndexMap = new HashMap<>();
     }
 
     public ColumnStore(String partitionBy) {
         this.disk = new Disk();
         this.indexSet = new HashSet<>();
         this.partitionBy = partitionBy;
+        this.zoneMapBy = null;
+        this.blockIndexMap = new HashMap<>();
+    }
+
+    public ColumnStore(String partitionBy, String zoneMapBy) {
+        this.disk = new Disk();
+        this.indexSet = new HashSet<>();
+        this.partitionBy = partitionBy;
+        this.zoneMapBy = zoneMapBy;
+        this.blockIndexMap = new HashMap<>();
     }
 
     public ColumnStore(ColumnStore other) {
@@ -30,6 +44,8 @@ public class ColumnStore {
         this.indexSet = new HashSet<>(other.indexSet);
         this.headers = Arrays.copyOf(other.headers, other.headers.length);
         this.partitionBy = other.partitionBy;
+        this.zoneMapBy = other.zoneMapBy;
+        this.blockIndexMap = new HashMap<>(other.blockIndexMap);
     }
 
     @SuppressWarnings("unchecked")
@@ -65,14 +81,18 @@ public class ColumnStore {
 
             if (partitionBy == null) {
                 for (String header : headers) {
-                    currentBlocks.put(header.trim(), new Block<>());
+                    boolean useZoneMap = zoneMapBy != null && zoneMapBy.equals(header.trim());
+                    currentBlocks.put(header.trim(), new Block<>(useZoneMap));
                 }
             }
 
             String line;
             while ((line = br.readLine()) != null) {
+                final int currentLine = lineCount;
                 String[] values = line.split(",", -1);
                 if (values.length != columnCount) continue;
+                
+                
 
                 if (partitionBy != null) {
                     String partitionKey = values[headerIndexMap.get(partitionBy)].trim();
@@ -94,11 +114,24 @@ public class ColumnStore {
 
                         List<Block<?>> blocks = partition.get(columnName);
                         if (blocks == null || blocks.isEmpty() || !blocks.get(blocks.size() - 1).isAbleToAdd(dataSize)) {
-                            Block<Object> newBlock = new Block<>();
+                            Block<Object> newBlock = new Block<>(zoneMapBy != null && zoneMapBy.equals(columnName));
                             newBlock.addData(value, dataSize);
                             partition.add(columnName, newBlock);
+
+                            if (zoneMapBy != null && zoneMapBy.equals(columnName)) {
+                                blockIndexMap.put(newBlock, new int[]{currentLine, currentLine});
+                            }
                         } else {
-                            ((Block<Object>) blocks.get(blocks.size() - 1)).addData(value, dataSize);
+                            Block<Object> block = (Block<Object>) blocks.get(blocks.size() - 1);
+                            block.addData(value, dataSize);
+
+                            if (zoneMapBy != null && zoneMapBy.equals(columnName)) {
+                                blockIndexMap.compute(block, (k, v) -> {
+                                    if (v == null) return new int[]{currentLine, currentLine};
+                                    v[1] = currentLine;
+                                    return v;
+                                });
+                            }
                         }
                     }
                 } else {
@@ -119,10 +152,19 @@ public class ColumnStore {
                         Block<Object> block = currentBlocks.get(columnName);
                         if (!block.isAbleToAdd(dataSize)) {
                             disk.add(columnName, block);
-                            block = new Block<>();
+                            block = new Block<>(zoneMapBy != null && zoneMapBy.equals(columnName));
                             currentBlocks.put(columnName, block);
                         }
                         block.addData(value, dataSize);
+
+                        if (zoneMapBy != null && zoneMapBy.equals(columnName)) {
+                            final Block<Object> currentBlock = block;
+                            blockIndexMap.compute(currentBlock, (k, v) -> {
+                                if (v == null) return new int[]{currentLine, currentLine};
+                                v[1] = currentLine;
+                                return v;
+                            });
+                        }
                     }
                 }
 
@@ -139,12 +181,12 @@ public class ColumnStore {
                     disk.add(entry.getKey(), entry.getValue());
                 }
             }
-            
+
             System.out.println("\n===== Disk Contents After Loading =====");
             for (Map.Entry<String, List<?>> entry : disk.getAll().entrySet()) {
                 String key = entry.getKey();
                 List<?> value = entry.getValue();
-                
+
                 if (!value.isEmpty()) {
                     Object first = value.get(0);
                     if (first instanceof Partition) {
@@ -159,6 +201,29 @@ public class ColumnStore {
                 }
             }
             System.out.println("========================================\n");
+
+            if (partitionBy == null) {
+                System.out.println("===== Block Count Per Column =====");
+                for (Map.Entry<String, List<?>> entry : disk.getAll().entrySet()) {
+                    String column = entry.getKey();
+                    List<?> blocks = entry.getValue();
+                    if (!blocks.isEmpty() && blocks.get(0) instanceof Block<?>) {
+                        System.out.println("Column: " + column + " -> Blocks Allocated: " + blocks.size());
+                    }
+                }
+                System.out.println("==================================\n");
+            }
+
+            if (zoneMapBy != null) {
+                System.out.println("===== Block Index Range (Zone Map) =====");
+                for (Map.Entry<Block<?>, int[]> entry : blockIndexMap.entrySet()) {
+                    Block<?> block = entry.getKey();
+                    int[] range = entry.getValue();
+                    System.out.println("Block Min: " + block.getMin() + ", Max: " + block.getMax() +
+                                       " -> Index Range: [" + range[0] + ", " + range[1] + "]");
+                }
+                System.out.println("========================================");
+            }
         }
 
         long endTime = System.currentTimeMillis();
@@ -180,11 +245,89 @@ public class ColumnStore {
             }
             rebuildIndexSetFromPartitions();
         } else {
+            if (zoneMapBy != null && zoneMapBy.equals(columnName)) {
+                Set<Integer> candidateIndices = new HashSet<>();
+
+                for (Map.Entry<Block<?>, int[]> entry : blockIndexMap.entrySet()) {
+                    Block<?> block = entry.getKey();
+                    int[] range = entry.getValue(); 
+
+                    String minStr = String.valueOf(block.getMin());
+                    String maxStr = String.valueOf(block.getMax());
+
+                    if (valueToMatch.compareTo(minStr) >= 0 && valueToMatch.compareTo(maxStr) <= 0) {
+                        for (int i = range[0]; i <= range[1]; i++) {
+                            candidateIndices.add(i);
+                        }
+                    }
+                }
+                indexSet.retainAll(candidateIndices);
+            }
+
             List<Object> columnValues = flattenColumn(columnName);
             indexSet.removeIf(i -> {
                 Object value = columnValues.get(i);
                 return !valueToMatch.equals(value.toString());
             });
+        }
+    }
+    
+    public void filterDataByRange(String columnName, String operator, float valueToMatch) {
+        if (zoneMapBy != null && zoneMapBy.equals(columnName)) {
+            Set<Integer> candidateIndices = new HashSet<>();
+
+            for (Map.Entry<Block<?>, int[]> entry : blockIndexMap.entrySet()) {
+                Block<?> block = entry.getKey();
+                int[] range = entry.getValue();
+
+                Float min = tryParseFloat(block.getMin());
+                Float max = tryParseFloat(block.getMax());
+                if (min == null || max == null) continue;
+
+                boolean isMatch = switch (operator) {
+                    case ">=" -> max >= valueToMatch;
+                    case "<=" -> min <= valueToMatch;
+                    case ">" -> max > valueToMatch;
+                    case "<" -> min < valueToMatch;
+                    default -> throw new IllegalArgumentException("Invalid operator: " + operator);
+                };
+
+                if (isMatch) {
+                    for (int i = range[0]; i <= range[1]; i++) {
+                        candidateIndices.add(i);
+                    }
+                }
+            }
+            indexSet.retainAll(candidateIndices);
+        }
+
+        List<Object> columnValues = flattenColumn(columnName);
+        indexSet.removeIf(i -> {
+            Object valueObj = columnValues.get(i);
+            if (valueObj == null) return true;
+            float value;
+            try {
+                value = Float.parseFloat(valueObj.toString());
+            } catch (NumberFormatException e) {
+                return true;
+            }
+
+            return switch (operator) {
+                case ">=" -> !(value >= valueToMatch);
+                case "<=" -> !(value <= valueToMatch);
+                case ">" -> !(value > valueToMatch);
+                case "<" -> !(value < valueToMatch);
+                default -> throw new IllegalArgumentException("Invalid operator: " + operator);
+            };
+        });
+    }
+    
+    private Float tryParseFloat(Object obj) {
+        if (obj == null) return null;
+        try {
+            return Float.parseFloat(obj.toString());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
@@ -225,28 +368,6 @@ public class ColumnStore {
                 return valueDate.isBefore(start) || valueDate.isAfter(end);
             });
         }
-    }
-
-    public void filterDataByRange(String columnName, String operator, float valueToMatch) {
-        List<Object> columnValues = flattenColumn(columnName);
-        indexSet.removeIf(i -> {
-            Object valueObj = columnValues.get(i);
-            if (valueObj == null) return true;
-            float value;
-            try {
-                value = Float.parseFloat(valueObj.toString());
-            } catch (NumberFormatException e) {
-                return true;
-            }
-
-            switch (operator) {
-                case ">=": return !(value >= valueToMatch);
-                case "<=": return !(value <= valueToMatch);
-                case ">": return !(value > valueToMatch);
-                case "<": return !(value < valueToMatch);
-                default: throw new IllegalArgumentException("Invalid operator: " + operator);
-            }
-        });
     }
 
     private LocalDate parseToLocalDate(String dateStr) {

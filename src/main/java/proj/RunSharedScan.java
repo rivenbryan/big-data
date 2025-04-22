@@ -5,8 +5,8 @@ import java.util.Map;
 
 public class RunSharedScan {
 
-    public static void runAndOutput(String matricNumber, Map<String, String> result, String partitionBy) throws Exception {
-        Statistics stats = run(result, partitionBy);
+    public static void runAndOutput(String matricNumber, Map<String, String> result, String partitionBy, String zoneMapBy) throws Exception {
+        Statistics stats = run(result, partitionBy, zoneMapBy);
 
         if (stats == null) {
             throw new RuntimeException("No result found after filtering");
@@ -22,8 +22,8 @@ public class RunSharedScan {
         Util.writeResultsToCSV(matricNumber, result, stats);
     }
 
-    private static Statistics run(Map<String, String> result, String partitionBy) throws Exception {
-        ColumnStore cs = (partitionBy == null) ? new ColumnStore() : new ColumnStore(partitionBy);
+    private static Statistics run(Map<String, String> result, String partitionBy, String zoneMapBy) throws Exception {
+        ColumnStore cs = new ColumnStore(partitionBy, zoneMapBy);
         cs.loadData(Constant.FILEPATH);
 
         applySmartFilter(cs, result, partitionBy);

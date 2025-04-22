@@ -13,8 +13,9 @@ public class Main {
         }
 
         String matricNumber = args[0];
-        boolean sharedScan = true; 
+        boolean sharedScan = true;
         String partitionBy = null;
+        String zoneMapBy = null;
 
         for (int i = 1; i < args.length; i++) {
             String arg = args[i];
@@ -30,6 +31,8 @@ public class Main {
                 }
             } else if (arg.startsWith("partitionBy=")) {
                 partitionBy = arg.substring("partitionBy=".length());
+            } else if (arg.startsWith("zoneMapBy=")) {
+                zoneMapBy = arg.substring("zoneMapBy=".length());
             } else {
                 throw new IllegalArgumentException("Unknown argument: " + arg);
             }
@@ -43,6 +46,12 @@ public class Main {
             System.out.println("No partitioning.");
         }
 
+        if (zoneMapBy != null) {
+            System.out.println("Zone Map Enabled on Column: " + zoneMapBy);
+        } else {
+            System.out.println("No Zone Map used.");
+        }
+
         Map<String, String> result = Util.preprocess(matricNumber);
         System.out.println("Preprocessing completed.");
         System.out.println("Town: " + result.get(Constant.KEY_TOWN_NAME));
@@ -51,9 +60,9 @@ public class Main {
 
         try {
             if (sharedScan) {
-                RunSharedScan.runAndOutput(matricNumber, result, partitionBy);
+                RunSharedScan.runAndOutput(matricNumber, result, partitionBy, zoneMapBy);
             } else {
-                RunNormal.runAndOutput(matricNumber, result, partitionBy);
+                RunNormal.runAndOutput(matricNumber, result, partitionBy, zoneMapBy);
             }
         } catch (Exception e) {
             System.out.println("Error occurred during execution: " + e.getMessage());

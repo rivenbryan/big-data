@@ -5,8 +5,8 @@ import java.util.Map;
 
 public class RunNormal {
 
-    public static void runAndOutput(String matricNumber, Map<String, String> result, String partitionBy) throws Exception {
-        Statistics[] statsArray = run(result, partitionBy);
+    public static void runAndOutput(String matricNumber, Map<String, String> result, String partitionBy, String zoneMapBy) throws Exception {
+        Statistics[] statsArray = run(result, partitionBy, zoneMapBy);
 
         if (statsArray == null) {
             throw new RuntimeException("No result found after filtering");
@@ -32,8 +32,8 @@ public class RunNormal {
         Util.writeResultsToCSV(matricNumber, result, statsArray, categories);
     }
 
-    private static Statistics[] run(Map<String, String> result, String partitionBy) throws Exception {
-        ColumnStore master = (partitionBy == null) ? new ColumnStore() : new ColumnStore(partitionBy);
+    private static Statistics[] run(Map<String, String> result, String partitionBy, String zoneMapBy) throws Exception {
+        ColumnStore master = new ColumnStore(partitionBy, zoneMapBy);
         master.loadData(Constant.FILEPATH);
 
         ColumnStore csMin = new ColumnStore(master);
