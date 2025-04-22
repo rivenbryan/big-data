@@ -74,4 +74,3 @@ ScanResult_A1234567X.csv
   - Start and end year-month (for filtering by date)
   - Town name (for filtering by location)
 - The dataset must be located at the path specified in `Constant.FILEPATH`
-```
