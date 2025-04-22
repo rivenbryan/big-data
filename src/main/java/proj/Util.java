@@ -6,8 +6,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Util class provides helper methods for preprocessing, data type casting,
+ * and writing computed statistics to a CSV file.
+ */
 public class Util {
 
+    /**
+     * Parses a matric card number to determine filter values for town and date range.
+     *
+     * @param matricCard The input matric card number
+     * @return A map containing town name, start year-month, and end year-month
+     */
     public static Map<String, String> preprocess(String matricCard) {
         int yearDigit = Integer.parseInt(matricCard.substring(matricCard.length() - 2, matricCard.length() - 1));
         int monthDigit = Integer.parseInt(matricCard.substring(matricCard.length() - 3, matricCard.length() - 2));
@@ -31,6 +41,12 @@ public class Util {
         return result;
     }
 
+    /**
+     * Casts a list of objects to a list of doubles.
+     *
+     * @param objects A list of generic objects
+     * @return A list of doubles
+     */
     public static List<Double> castToDouble(List<Object> objects) {
         return objects.stream()
                 .map(o -> {
@@ -43,6 +59,14 @@ public class Util {
                 .toList();
     }
 
+    /**
+     * Writes multiple statistics to a CSV file.
+     *
+     * @param matricNumber The matric number used in the output filename
+     * @param queryParams  The preprocessed filter values
+     * @param statsArray   Array of statistics for each metric
+     * @param categories   Corresponding category names
+     */
     public static void writeResultsToCSV(String matricNumber, Map<String, String> queryParams, Statistics[] statsArray, String[] categories) {
         String fileName = "ScanResult_" + matricNumber + ".csv";
 
@@ -65,6 +89,13 @@ public class Util {
         }
     }
 
+    /**
+     * Writes a single Statistics object (shared scan) to a CSV file.
+     *
+     * @param matricNumber The matric number used in the output filename
+     * @param queryParams  The preprocessed filter values
+     * @param stats        The statistics object containing all computed values
+     */
     public static void writeResultsToCSV(String matricNumber, Map<String, String> queryParams, Statistics stats) {
         String fileName = "ScanResult_" + matricNumber + ".csv";
 
@@ -87,6 +118,17 @@ public class Util {
         }
     }
 
+    /**
+     * Helper method to write a single line of statistic data to the CSV file.
+     *
+     * @param writer   The FileWriter instance
+     * @param year     The year portion of the date
+     * @param month    The month portion of the date
+     * @param town     The town name
+     * @param category The statistic category name
+     * @param value    The statistic value as a formatted string
+     * @throws IOException If writing fails
+     */
     private static void writeStatLine(FileWriter writer, String year, String month, String town, String category, String value) throws IOException {
         writer.write(year + "," + month + "," + town + "," + category + "," + value + "\n");
     }

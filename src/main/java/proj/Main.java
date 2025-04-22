@@ -2,8 +2,23 @@ package proj;
 
 import java.util.Map;
 
+/**
+ * Main class serves as the entry point for the columnar storage engine application.
+ * Accepts command-line arguments to configure execution options including preprocessing,
+ * partitioning, zone map indexing, and scan mode selection.
+ */
 public class Main {
 
+    /**
+     * Main method that parses command-line arguments, performs preprocessing, and executes
+     * the selected scan mode (shared or normal) with optional partitioning and zone map indexing.
+     *
+     * @param args Command-line arguments:
+     *             - args[0]: Matric number (required)
+     *             - sharedScan=true/false (optional)
+     *             - partitionBy=<column> (optional)
+     *             - zoneMapBy=<column> (optional)
+     */
     public static void main(String[] args) {
         long startTime = System.currentTimeMillis();
 

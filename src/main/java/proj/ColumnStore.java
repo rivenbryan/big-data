@@ -6,6 +6,11 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
+/**
+ * ColumnStore class implements a simplified in-memory columnar storage system.
+ * It supports data loading, filtering by equality, range, and date, as well as optional
+ * partitioning and zone map indexing for performance optimization.
+ */
 public class ColumnStore {
 
     private final Disk disk;
@@ -15,6 +20,9 @@ public class ColumnStore {
     private String zoneMapBy;
     private Map<Block<?>, int[]> blockIndexMap;
 
+    /**
+     * Constructs a ColumnStore with no partitioning or zone map indexing.
+     */
     public ColumnStore() {
         this.disk = new Disk();
         this.indexSet = new HashSet<>();
@@ -23,6 +31,11 @@ public class ColumnStore {
         this.blockIndexMap = new HashMap<>();
     }
 
+    /**
+     * Constructs a ColumnStore with partitioning enabled on the specified column.
+     *
+     * @param partitionBy The column used for partitioning
+     */
     public ColumnStore(String partitionBy) {
         this.disk = new Disk();
         this.indexSet = new HashSet<>();
@@ -31,6 +44,12 @@ public class ColumnStore {
         this.blockIndexMap = new HashMap<>();
     }
 
+    /**
+     * Constructs a ColumnStore with both partitioning and zone map indexing enabled.
+     *
+     * @param partitionBy The column used for partitioning
+     * @param zoneMapBy   The column used for zone map indexing
+     */
     public ColumnStore(String partitionBy, String zoneMapBy) {
         this.disk = new Disk();
         this.indexSet = new HashSet<>();
@@ -39,6 +58,11 @@ public class ColumnStore {
         this.blockIndexMap = new HashMap<>();
     }
 
+    /**
+     * Copy constructor that duplicates an existing ColumnStore's configuration and state.
+     *
+     * @param other The existing ColumnStore to copy
+     */
     public ColumnStore(ColumnStore other) {
         this.disk = other.disk;
         this.indexSet = new HashSet<>(other.indexSet);
@@ -48,6 +72,13 @@ public class ColumnStore {
         this.blockIndexMap = new HashMap<>(other.blockIndexMap);
     }
 
+    /**
+     * Loads data from a CSV file into the columnar structure. Supports block-level partitioning
+     * and zone map construction during load.
+     *
+     * @param filepath Path to the CSV file to be loaded
+     * @throws IOException If the file is missing or malformed
+     */
     @SuppressWarnings("unchecked")
     public void loadData(String filepath) throws IOException {
         long startTime = System.currentTimeMillis();
@@ -231,6 +262,12 @@ public class ColumnStore {
         System.out.println(String.format("Data loading completed in %.2f seconds.", totalTimeSeconds));
     }
 
+    /**
+     * Filters the data by equality match on the specified column.
+     *
+     * @param columnName   The name of the column to filter
+     * @param valueToMatch The value to match
+     */
     public void filterDataByEquality(String columnName, String valueToMatch) {
         if (partitionBy != null && partitionBy.equals(columnName)) {
             Map<String, List<?>> rawPartitions = disk.getAll();
@@ -272,6 +309,13 @@ public class ColumnStore {
         }
     }
     
+    /**
+     * Filters the data by a numerical comparison on the specified column.
+     *
+     * @param columnName   The name of the column to filter
+     * @param operator     The comparison operator (">", ">=", "<", "<=")
+     * @param valueToMatch The numeric threshold for comparison
+     */
     public void filterDataByRange(String columnName, String operator, float valueToMatch) {
         if (zoneMapBy != null && zoneMapBy.equals(columnName)) {
             Set<Integer> candidateIndices = new HashSet<>();
@@ -322,6 +366,12 @@ public class ColumnStore {
         });
     }
     
+    /**
+     * Helper method to safely convert an object to a Float, returning null if parsing fails.
+     *
+     * @param obj The object to parse
+     * @return Parsed Float or null
+     */
     private Float tryParseFloat(Object obj) {
         if (obj == null) return null;
         try {
@@ -331,6 +381,13 @@ public class ColumnStore {
         }
     }
 
+    /**
+     * Filters the data using a date range on the specified column.
+     *
+     * @param columnName The date-based column to filter
+     * @param startDate  The inclusive start date (yyyy-MM or yyyy-MM-dd)
+     * @param endDate    The inclusive end date (yyyy-MM or yyyy-MM-dd)
+     */
     public void filterDataByDateRange(String columnName, String startDate, String endDate) {
         if (partitionBy != null && partitionBy.equals(columnName)) {
             Map<String, List<?>> rawPartitions = disk.getAll();
@@ -370,6 +427,12 @@ public class ColumnStore {
         }
     }
 
+    /**
+     * Parses a date string into a LocalDate, supporting multiple formats.
+     *
+     * @param dateStr The date string
+     * @return The corresponding LocalDate object
+     */
     private LocalDate parseToLocalDate(String dateStr) {
         if (dateStr.length() == 4) {
             return LocalDate.parse(dateStr + "-01-01", DateTimeFormatter.ofPattern("yyyy-MM-dd"));
@@ -380,6 +443,12 @@ public class ColumnStore {
         }
     }
 
+    /**
+     * Retrieves the filtered values from a column based on the current index set.
+     *
+     * @param columnName The name of the column to extract
+     * @return A list of filtered values
+     */
     public List<Object> getColumnValues(String columnName) {
         List<Object> columnValues = flattenColumn(columnName);
         List<Object> filteredValues = new ArrayList<>();
@@ -389,6 +458,12 @@ public class ColumnStore {
         return filteredValues;
     }
 
+    /**
+     * Flattens all blocks under the given column into a single list of raw values.
+     *
+     * @param columnName The column name to flatten
+     * @return A list of all values across blocks for the column
+     */
     private List<Object> flattenColumn(String columnName) {
         List<Object> result = new ArrayList<>();
         if (partitionBy == null) {
@@ -417,6 +492,9 @@ public class ColumnStore {
         return result;
     }
 
+    /**
+     * Rebuilds the index set from existing partitions after filtering by partition key.
+     */
     private void rebuildIndexSetFromPartitions() {
         indexSet.clear();
         int currentIndex = 0;

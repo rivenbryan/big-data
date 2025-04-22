@@ -3,8 +3,21 @@ package proj;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * RunNormal class handles the execution of the columnar scan using the normal (non-shared) scan mode.
+ * It applies smart filtering and computes various statistics from the filtered dataset.
+ */
 public class RunNormal {
 
+    /**
+     * Executes the normal scan, computes statistics, and outputs the result to console and CSV.
+     *
+     * @param matricNumber The matric number used for naming the output file
+     * @param result        Preprocessed filter values (e.g., town, date range)
+     * @param partitionBy   Column used for partitioning (optional)
+     * @param zoneMapBy     Column used for zone map indexing (optional)
+     * @throws Exception If there is an error during processing or data loading
+     */
     public static void runAndOutput(String matricNumber, Map<String, String> result, String partitionBy, String zoneMapBy) throws Exception {
         Statistics[] statsArray = run(result, partitionBy, zoneMapBy);
 
@@ -32,6 +45,15 @@ public class RunNormal {
         Util.writeResultsToCSV(matricNumber, result, statsArray, categories);
     }
 
+    /**
+     * Internal logic to load data, apply filters, and prepare Statistics objects.
+     *
+     * @param result      Preprocessed filter values
+     * @param partitionBy Partition column (if any)
+     * @param zoneMapBy   Zone map index column (if any)
+     * @return An array of Statistics for each metric
+     * @throws Exception If any step of loading or filtering fails
+     */
     private static Statistics[] run(Map<String, String> result, String partitionBy, String zoneMapBy) throws Exception {
         ColumnStore master = new ColumnStore(partitionBy, zoneMapBy);
         master.loadData(Constant.FILEPATH);
@@ -64,6 +86,14 @@ public class RunNormal {
         return new Statistics[]{statsMin, statsAvg, statsStd, statsMinPerSqm};
     }
 
+    /**
+     * Applies smart filtering to a ColumnStore instance based on date range, town, and floor area.
+     *
+     * @param cs          The ColumnStore to filter
+     * @param result      The preprocessed filter values
+     * @param partitionBy The column used for partitioning, if applicable
+     * @throws Exception If filtering fails
+     */
     private static void applySmartFilter(ColumnStore cs, Map<String, String> result, String partitionBy) throws Exception {
         if ("town".equals(partitionBy)) {
             cs.filterDataByEquality("town", result.get(Constant.KEY_TOWN_NAME));
